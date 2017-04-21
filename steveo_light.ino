@@ -285,6 +285,13 @@ void colorWipe(uint32_t c, uint8_t wait) {
 /********************************** START MAIN LOOP***************************************/
 void loop() {
 
+  if (WiFi.status() != WL_CONNECTED) {
+    delay(1);
+    Serial.print("OMG: I lost my weefees");
+    setup_wifi();
+    return;
+  }
+
   ArduinoOTA.handle();
 
   if (!client.connected()) {
