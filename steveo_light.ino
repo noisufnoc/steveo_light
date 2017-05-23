@@ -32,7 +32,7 @@ const int   OTAport = CONFIG_OTA_PORT;
 // Connect NeoPixel to D4 on ESP
 #define NEOPIN    D4
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(60, NEOPIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(7, NEOPIN, NEO_GRB + NEO_KHZ800);
 
 const int BUFFER_SIZE = 300;
 
@@ -110,6 +110,7 @@ void setup() {
 /********************************** START SETUP WIFI*****************************************/
 void setup_wifi() {
 
+  Serial.print("I'm setting up wifi!\n");
   delay(10);
   Serial.println();
   Serial.print("Connecting to ");
@@ -127,12 +128,14 @@ void setup_wifi() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+  Serial.println("I'm done setting up wifi!\n");
 }
 
 
 
 /********************************** START CALLBACK*****************************************/
 void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("I'm calling back!\n");
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
@@ -161,12 +164,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   sendState();
+  Serial.print("I'm done calling back!\n");
 }
 
 
 
 /********************************** START PROCESS JSON*****************************************/
 bool processJson(char* message) {
+  Serial.print("I'm processing JSON\n");
   StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
 
   JsonObject& root = jsonBuffer.parseObject(message);
@@ -202,6 +207,7 @@ bool processJson(char* message) {
     transitionTime = 0;
   }
 
+  Serial.print("I'm done processing JSON!\n");
   return true;
 }
 
@@ -209,6 +215,7 @@ bool processJson(char* message) {
 
 /********************************** START SEND STATE*****************************************/
 void sendState() {
+  Serial.print("I'm sending state!\n");
   StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
 
   JsonObject& root = jsonBuffer.createObject();
@@ -226,13 +233,21 @@ void sendState() {
   char buffer[root.measureLength() + 1];
   root.printTo(buffer, sizeof(buffer));
 
+  if (!client.connected()) {
+    Serial.print("I can't publish if I'm not connected to MQTT\n");
+    reconnect();
+  } else {
+  Serial.print("I'm publishing to MQTT...\n");
   Serial.println(buffer);
   client.publish(light_state_topic, buffer, true);
+  }
+  Serial.print("I'm done sending state!\n");
 }
 
 
 /********************************** START SET COLOR *****************************************/
 void setColor(int inR, int inG, int inB) {
+  Serial.print("I'm setting color!\n");
   colorWipe(strip.Color(inR, inG, inB), 50);
 
   Serial.println("Setting LEDs:");
@@ -242,10 +257,14 @@ void setColor(int inR, int inG, int inB) {
   Serial.print(inG);
   Serial.print(", b: ");
   Serial.println(inB);
+
+  Serial.print("I'm done setting color!\n");
 }
 
 void setBrightness(int inBrightness) {
+  Serial.print("I'm setting brightness!\n");
   strip.setBrightness(inBrightness);
+  Serial.print("I'm done setting brightness!\n");
 }
 
 
@@ -253,6 +272,15 @@ void setBrightness(int inBrightness) {
 /********************************** START RECONNECT*****************************************/
 void reconnect() {
   // Loop until we're reconnected
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("Just checking, I have the wifi.\n");
+  } else {
+    Serial.print("For whatever reason, I don't have the wifi.\n");
+    setup_wifi();
+    return;
+  }
+
+  Serial.print("I'm reconnecting to MQTT!\n");
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
@@ -264,11 +292,19 @@ void reconnect() {
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      Serial.println(" try again in 10 seconds");
+      // Wait 10 seconds before retrying
+      delay(10000);
+      if (WiFi.status() == WL_CONNECTED) {
+        Serial.print("Just checking again, I have the wifi.\n");
+      } else {
+        Serial.print("You can't connect to MQTT if you don't have the wifi.\n");
+        setup_wifi();
+        return;
+      }
     }
   }
+  Serial.print("I'm done reconnecting to MQTT!\n");
 }
 
 // Fill the dots one after the other with a color
@@ -285,6 +321,7 @@ void colorWipe(uint32_t c, uint8_t wait) {
 /********************************** START MAIN LOOP***************************************/
 void loop() {
 
+  Serial.print("Loop-da-loop!\n");
   if (WiFi.status() != WL_CONNECTED) {
     delay(1);
     Serial.print("OMG: I lost my weefees");
@@ -295,11 +332,18 @@ void loop() {
   ArduinoOTA.handle();
 
   if (!client.connected()) {
+    if (WiFi.status() != WL_CONNECTED) {
+      delay(1);
+      Serial.print("I need wifi to connect to MQTT");
+      setup_wifi();
+      return;
+    }
     reconnect();
   }
   client.loop();
 
   setColor(realRed, realGreen, realBlue);
   setBrightness(brightness);
+  Serial.print("fin.\n\n");
       
 }
